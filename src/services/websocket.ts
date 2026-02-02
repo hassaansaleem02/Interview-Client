@@ -35,7 +35,7 @@ class WebSocketService {
 
         this.socket.onerror = (error) => {
           console.error('WebSocket error:', error);
-          reject(error);
+          // Don't immediately reject - let onclose handle reconnection
         };
 
       } catch (error) {
@@ -53,10 +53,14 @@ class WebSocketService {
   }
 
   sendMessage(message: any) {
+    console.log('Attempting to send message:', message);
+    console.log('WebSocket readyState:', this.socket?.readyState);
+    
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message));
+      console.log('Message sent successfully');
     } else {
-      console.error('WebSocket is not connected');
+      console.error('WebSocket is not connected. ReadyState:', this.socket?.readyState);
     }
   }
 

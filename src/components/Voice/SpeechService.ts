@@ -3,6 +3,7 @@ export interface ISpeechService {
   startListening(): Promise<string>;
   stopListening(): void;
   speak(text: string): void;
+  stop(): void;
   isAvailable(): boolean;
 }
 
@@ -81,6 +82,13 @@ export class BrowserSpeechService implements ISpeechService {
       
       speechSynthesis.speak(utterance);
     }
+  }
+
+  stop() {
+    if ('speechSynthesis' in window) {
+      speechSynthesis.cancel();
+    }
+    this.stopListening();
   }
 
   isAvailable(): boolean {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Message, InterviewState } from '../../types/interview';
 import { websocketService } from '../../services/websocket';
@@ -21,7 +21,22 @@ const InterviewScreen: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  const handleWebSocketMessage = (data: any) => {
+  const addMessage = useCallback((speaker: 'user' | 'ai', text: string, question?: string) => {
+    const newMessage: Message = {
+      id: uuidv4(),
+      speaker,
+      text,
+      timestamp: new Date(),
+      question
+    };
+
+    setInterviewState(prev => ({
+      ...prev,
+      messages: [...prev.messages, newMessage]
+    }));
+  }, []);
+
+  const handleWebSocketMessage = useCallback((data: any) => {
     console.log('Received:', data);
     
     switch (data.type) {
@@ -48,15 +63,21 @@ const InterviewScreen: React.FC = () => {
         break;
         
       case 'interview_complete':
-        addMessage('ai', 'Interview completed! Thank you for your time.');
-        setInterviewState(prev => ({ ...prev, isActive: false }));
+        setInterviewState(prev => ({ 
+          ...prev, 
+          isActive: false, 
+          isAIThinking: false,
+          messages: [],
+          currentQuestionIndex: 0
+        }));
         break;
         
       case 'error':
         console.error('Server error:', data);
+        setInterviewState(prev => ({ ...prev, isAIThinking: false }));
         break;
     }
-  };
+  }, [addMessage]);
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -88,23 +109,13 @@ const InterviewScreen: React.FC = () => {
     };
   }, [interviewState.id, handleWebSocketMessage]);
 
-  const addMessage = (speaker: 'user' | 'ai', text: string, question?: string) => {
-    const newMessage: Message = {
-      id: uuidv4(),
-      speaker,
-      text,
-      timestamp: new Date(),
-      question
-    };
-
-    setInterviewState(prev => ({
-      ...prev,
-      messages: [...prev.messages, newMessage]
-    }));
-  };
 
   const startInterview = () => {
-    setInterviewState(prev => ({ ...prev, isActive: true }));
+    setInterviewState(prev => ({ 
+      ...prev, 
+      isActive: true,
+      isAIThinking: true 
+    }));
     
     websocketService.sendMessage({
       type: 'start_interview',
@@ -130,10 +141,22 @@ const InterviewScreen: React.FC = () => {
   };
 
   const endInterview = () => {
+    // Stop any ongoing speech
+    speechService.stop();
+    
     websocketService.sendMessage({
       type: 'end_interview'
     });
-    setInterviewState(prev => ({ ...prev, isActive: false }));
+    
+    // Reset all interview states
+    setInterviewState(prev => ({
+      ...prev,
+      isActive: false,
+      isRecording: false,
+      isAIThinking: false,
+      messages: [],
+      currentQuestionIndex: 0
+    }));
   };
 
   if (!isConnected) {
